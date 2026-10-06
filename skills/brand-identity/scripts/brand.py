@@ -186,8 +186,8 @@ def cmd_init(args):
         states[comp] = mode
     work = os.path.abspath(os.path.join(args.root, slugify(args.name)))
     if os.path.exists(os.path.join(work, "brief.json")) and not args.force:
-        _fail(f"{work} already exists; pass --force to rewrite brief.json (sets.json and set folders are kept; "
-              "--reset-draft also replaces sets.json)")
+        _fail(f"{work} already exists; pass --force to rewrite brief.json (sets.json and set folders are kept, "
+              "set components follow the new --state/--source; --reset-draft also replaces sets.json)")
     langs = [x.strip() for x in args.langs.split(",") if x.strip()] or ["en"]
     doc_lang = (args.doc_lang or langs[0]).strip()
     try:
@@ -222,9 +222,17 @@ def cmd_init(args):
         sdir = os.path.join(work, "sets", sid)
         os.makedirs(os.path.join(sdir, "logo"), exist_ok=True)
         path = os.path.join(sdir, "identity.json")
+        skel = _skeleton(args.name, sid, langs, states, args.numbers, sources, doc_lang)
         if not os.path.exists(path):
-            identitylib.save_identity(path, _skeleton(args.name, sid, langs, states, args.numbers, sources, doc_lang),
-                                      partial=True)
+            identitylib.save_identity(path, skel, partial=True)
+        elif args.force:  # keep the set's design work, but its components follow the new --state/--source
+            ident = identitylib.load_identity(path, partial=True)
+            for c, comp in skel["components"].items():
+                old = (ident.get("components") or {}).get(c) or {}
+                if old.get("mode") == comp["mode"] and old.get("source") == comp["source"]:
+                    comp["sha256"] = old.get("sha256")
+            ident["components"] = skel["components"]
+            identitylib.save_identity(path, ident, partial=True)
         made.append(path)
         draft["sets"].append({"identity": {"set": {"id": sid, "name": "", "recommended": False, "mechanism": "",
                                                    "expression_move": "", "differs_by": ""},

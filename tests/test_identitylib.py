@@ -79,6 +79,21 @@ class InitCommand(unittest.TestCase):
                                                        "sha256": None})
             self.assertEqual(d["brand"]["languages"], ["en", "tr"])
 
+    def test_force_resyncs_component_modes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            init = [sys.executable, os.path.join(SCRIPTS, "brand.py"), "init", "Moon Vault", "--sets", "1"]
+            r = subprocess.run(init + ["--state", "type=refresh"], cwd=tmp, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            path = os.path.join(tmp, "brand-identity", "moon-vault", "sets", "A", "identity.json")
+            d = I.load_identity(path, partial=True)
+            d["set"]["name"] = "Kept Work"
+            I.save_identity(path, d, partial=True)
+            r = subprocess.run(init + ["--state", "type=new", "--force"], cwd=tmp, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            d = I.load_identity(path, partial=True)
+            self.assertEqual(d["components"]["type"]["mode"], "new")
+            self.assertEqual(d["set"]["name"], "Kept Work")
+
     def test_too_many_sets(self):
         r = subprocess.run([sys.executable, os.path.join(SCRIPTS, "brand.py"), "init", "X", "--sets", "5"],
                            capture_output=True, text=True)
